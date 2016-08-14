@@ -1,5 +1,11 @@
 #!/usr/bin/python
-from fabric.api import run,local
+'''
+local: run local
+run: run with host
+
+'''
+from fabric.api import run,local,settings,abort
+
 def host_type(message="Linux"):
     run('uname -s')
     print("System type: %s" % message)
@@ -10,5 +16,9 @@ def new_user(username, admin='no', comment="No comment provided"):
     pass
 
 def git_push(command="git commit"):
-    local("git add . && git commit -m %s" % command)
-    local("git push")
+    with settings(warn_only=True):
+        result1 = local("git add . && git commit -m %s" % command)
+        result2 = local("git push")
+        if result1.failed or result2.failed and not confirm("Tests failed. Continue anyway?"):
+            abort("Aborting at user request.")
+
