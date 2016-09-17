@@ -1,6 +1,9 @@
 #!/usr/bin/python
 
 import exceptions
+import sys
+import warnings
+
 
 class MuffledCalculator():
     Mullfed = False
@@ -22,7 +25,7 @@ class MuffledCalculator():
             print "y should not be zero!"
         except TypeError:
             print "y should be a number!"
-        except Exception,e:
+        except Exception as e:    #every exception could make an Exception as e.it will catch every exception
             print "Invalid input:",e
             print "Try again"
         finally:
@@ -48,5 +51,8 @@ if __name__ == "__main__":
     calculator = MuffledCalculator()
     calculator.exception_ex1("10/2")
     calculator.ignore_exception()
+    warnings.filterwarnings()  #filter warnings
 
+
+#TBC
 
