@@ -1,5 +1,5 @@
 #!/usr/bin/python
-#coding: utf-8
+# coding: utf-8
 import os,sys,atexit,commands
 import logging,time
 from signal import SIGTERM
