@@ -3,6 +3,5 @@ def flyable(message):
         def fly(self):
             print(message)
         cls.fly = fly
-        
         return cls
     return flyable_to_return
