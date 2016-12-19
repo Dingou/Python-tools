@@ -5,6 +5,7 @@ import os
 import sys
 import json
 from fabric.api import *
+from fabric.contrib.files import sed, contains
 
 
 env.roledefs = {
@@ -85,6 +86,9 @@ def _get_config():
     config['os'] = _get_os()
     config['user'] = user
     config['remote_user'] = env.user or user
+    config['salt_file_dir'] = '/srv/devops/'
+    config['salt_pillar_dir'] = '/srv/pillar'
+    config['salt_config_file'] = '/etc/salt/master'
     config['home_dir'] = '/home/%(remote_user)s' % config
     return config
 
@@ -126,7 +130,7 @@ def dev():
     env.config = _get_config()
     env.salt = 'salt-call'
     env.run = _run
-    env.port = '2222'
+    env.port = '4916'
     env.ssh_key_path = '/%s/%s/%s'
     env.key_filename = _get_key_file(env.config)
 
@@ -140,7 +144,7 @@ def preprod():
     env.ssh_key_path = '/%s/%s/.ssh/%s'
     env.key_filename = _get_key_file(env.config)
     env.run = _run
-    env.port = '2222'
+    env.port = '4916'
     env.roledefs = {
         'master': ['bastion-pre.ylly.co'],
     }
@@ -155,7 +159,7 @@ def prod():
     env.ssh_key_path = '/%s/%s/.ssh/%s'
     env.key_filename = _get_key_file(env.config)
     env.run = _run
-    env.port = '2222'
+    env.port = '4916'
     env.roledefs = {
         'master': ['bastion.ylly.co'],
     }
@@ -176,7 +180,7 @@ def minion(id="'*'"):
 
 
 @roles('master')
-def command(module='test.ping', state='', test=False, loglevel='info'):
+def command(module='test.ping', state='', test=False, loglevel='info', out_diff=False):
     """Sets the command for saltstack deployment """
     cmd = [env.salt]
     if env.salt == 'salt':
@@ -185,6 +189,8 @@ def command(module='test.ping', state='', test=False, loglevel='info'):
     cmd.append(module)
     cmd.append(state)
     cmd.append('-l {}'.format(loglevel))
+    if out_diff in TRUE_VALUES:
+        cmd.append('--output-diff')
     if test in TRUE_VALUES:
         cmd.append('test=true')
     env.run(' '.join(cmd))
@@ -194,3 +200,45 @@ def command(module='test.ping', state='', test=False, loglevel='info'):
 @roles('master')
 def minion_keys():
     sudo('salt-key -L')
+
+
+@roles('master')
+def refresh_cache():
+    minion = env.config.get('minion', "'*'")
+    sudo('salt {0} saltutil.refresh_pillar'.format(minion))
+    sudo('salt {0} saltutil.refresh_modules'.format(minion))
+    sudo('salt {0} state.clear_cache'.format(minion))
+
+
+@roles('master')
+def pull():
+    for salt_path in [env.config['salt_file_dir'], env.config['salt_pillar_dir']]:
+        with cd(salt_path):
+            sudo('git fetch origin {branch} && git checkout {branch}'.format(**env.config))
+            sudo('git pull origin {branch}'.format(**env.config))
+    update_master_configure()
+
+
+@roles('master')
+def branch(name=None):
+    if name:
+        env.config['branch'] = name
+
+
+@roles('master')
+def update_master_configure():
+    pattern = 'gitfs_base: '+env.config['branch']
+    if not contains(env.config['salt_config_file'], pattern):
+        sed(env.config['salt_config_file'],
+            '^gitfs_base:.*$',    # <before> pattern for replacement
+            'gitfs_base: '+env.config['branch'],   # <after> replacement to
+            use_sudo=True,       # with sudo
+            shell=True)
+        restart_master()
+
+
+@roles('master')
+def restart_master():
+    sudo('rm -rf /var/cache/salt', settings(warn_only=True))
+    for srv in ['salt-master', 'salt-minion', 'salt-api']:
+        sudo('service {} restart'.format(srv), settings(warn_only=True))
