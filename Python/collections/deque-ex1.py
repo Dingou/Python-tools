@@ -5,3 +5,6 @@ d = deque(['a','b','c'])
 d.append('d')
 d.pop()
 d.popleft()
+
+
+q = deque([], 5)
