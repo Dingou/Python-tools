@@ -133,9 +133,8 @@ class AntiCrawler(NginxLogParse):
         :return request_info.IP
         :rtype ``str``
         """
-
+        ret = 0
         try:
-            ret = 0
             if filter_dict is not None and request_info is not None:
                 if filter_option is None:
                     filter_option = self.crawler_keywords_dict.keys()
@@ -172,9 +171,8 @@ class AntiCrawler(NginxLogParse):
         """
         ip_list = []
         try:
-            if isinstance(CrawlerLimit, crawler_limit):
+            if isinstance(crawler_limit, CrawlerLimit):
                 ip_count_dict = {}
-                ip_crawler_list = []
                 logs = self.get_ngx_logs(crawler_limit.msgs_limit)
                 start_request_log, end_request_log = logs[0], logs[-1]
                 time_gap = self.request_time_gap(start_request_log, end_request_log)
@@ -212,38 +210,51 @@ class AntiCrawler(NginxLogParse):
         # this crawler_ip_list should delete ip in white_list and blackips.conf
 
         raw_crawler_ip_list = []
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.crawler_limits)) as executor:
+                rts = [executor.submit(self.logs_filter_by_crawler_limit, crawler_limit, filter_option) for crawler_limit
+                       in crawler_limits]
+                for rt in concurrent.futures.as_completed(rts):
+                    raw_crawler_ip_list += rt.result()
+            return list(set(raw_crawler_ip_list))
+        except Exception as e:
+            print "Failed to get raw_crawler_ip_list by concurrent run function logs_filter_by_crawler_limit " \
+                  "due to %s" % e
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(self.crawler_limits)) as executor:
-            rts = [executor.submit(self.logs_filter_by_crawler_limit, crawler_limit, filter_option) for crawler_limit
-                   in self.crawler_limits]
-            for rt in concurrent.futures.as_completed(rts):
-                raw_crawler_ip_list += rt.result()
-        return list(set(raw_crawler_ip_list))
-
-    def finnal_crawler_ip_list(self, ip_list=None):
+    def crawler_ip_list(self, ip_list=None):
         """
         Removed ip already in blackips.conf and white_list
         :param ip_list:
         ip_set generate by con_logs_filter_by_crawler_limit/
         :type ip_list:
         ``list``
+        :return crawler_ip_list:
+        :rtype crawler_ip_list: ``list``
         """
+        ip_black_list = []
+        try:
+            with open(self.blk_conf, 'r+') as fd:
+                for line in fd.readlines():
+                    ip_black_list += [ip for ip in ip_list if re.match(r"^deny\s%s;\n$" % ip, line)]
+                crawler_ip_list = [ip for ip in ip_list if ip not in ip_black_list + self.white_list]
+            return crawler_ip_list
+        except Exception as e:
+            print "Failed get crawler_ip_list due to %s" % e
 
-        ip_already_black = []
-
-        with open(self.blk_conf, 'r+') as fd:
-            for line in fd.readlines():
-                ip_already_black += [ip for ip in ip_list if re.match(r"^deny\s%s;\n$" % ip, line)]
-            crawler_ip_list = [ip for ip in ip_list if ip not in ip_already_black + self.white_list]
-            blk_ips_conf = ["deny %s;\n" % ip for ip in crawler_ip_list]
-            for new_ip_blk_conf in blk_ips_conf:
-                fd.write(new_ip_blk_conf)
-        return crawler_ip_list
-
+    def black_ip_conf(self, black_ip_list=None):
+        try:
+            if black_ip_list is not None:
+                with open(self.blk_conf, 'a+') as fd:
+                    black_ip_confs = ["deny %s;\n" % ip for ip in black_ip_list]
+                    for new_ip_blk_conf in black_ip_confs:
+                        fd.write(new_ip_blk_conf)
+        except Exception as e:
+            print "Failed add black ip conf to %s due to %s" % (self.blk_conf, e)
 
 
 
 # TODO should move to test
+# from config import CrawlerLimit
 # from anti_crawler import AntiCrawler
 # a = AntiCrawler()
 # a.ngx_log = '/Users/leo/web1-nginx-log/access.log-20170101'
@@ -252,7 +263,12 @@ class AntiCrawler(NginxLogParse):
 # a.crawlers_re()
 # a.crawler_keywords_dict['Path'] = ['/airplanes/4349566766/']
 # a.crawler_keywords_dict['Useragent'] = ['Mozilla/5.0']
-# a.filter_request_info(req_info, a.crawlers_re(), ['Useragent'])
+# a.request_info_filter(req_info, a.crawlers_re())
+# a.request_info_filter(req_info, a.crawlers_re(), ['Useragent'])
+# a.logs_filter_by_crawler_limit(CrawlerLimit(-500, 150, 1800))
+# a.con_logs_filter_by_crawler_limit(a.crawler_limits)
+# a.blk_conf = '/Users/leo/web1-nginx-log/1.conf'
+# a.black_ip_conf(['1.1.1.1'])
 # ret = 0
 # if a.crawlers_re() is not None and req_info is not None:
 #   for key in ['Path']:
