@@ -1,6 +1,18 @@
+# -*- coding: utf-8 -*-
+#    Copyright (c) 2017 Feng Shuo
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+
 import commands
 
-class Nginx(object):
+__all__ = ['NginxReload', ]
+
+
+class NginxReload(object):
 
     __slots__ = ('_ngx_rld', 'ngx_rld', '_ngx_chk', 'ngx_chk')
 
@@ -20,7 +32,7 @@ class Nginx(object):
     def ngx_chk(self):
         return self._ngx_chk
 
-    @ngx_rld.setter
+    @ngx_chk.setter
     def ngx_chk(self, cmd):
         self._ngx_chk = cmd
 
@@ -28,4 +40,3 @@ class Nginx(object):
         if commands.getstatusoutput(self.ngx_chk)[0] == 0:
             (status, output) = commands.getstatusoutput(self.ngx_rld)
             return status if status == 0 else exit(1)
-

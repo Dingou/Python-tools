@@ -37,9 +37,9 @@ d3 = { x: randint(1,4) for x in sample('abcdefg', randint(1,5)) }
 d4 = { x: randint(1,4) for x in sample('abcdefg', randint(1,5)) }
 d5 = { x: randint(1,4) for x in sample('abcdefg', randint(1,5)) }
 
-map(dict.viewkeys, [d3, d4 ,d5])
+map(dict.viewkeys, [d3, d4, d5])
 
-reduce(lambda a,b: a & b, map(dict.viewkeys, [d3, d4 ,d5]))
+reduce(lambda a,b: a & b, map(dict.viewkeys, [d3, d4, d5]))
 
 #让字典变的有序
 
